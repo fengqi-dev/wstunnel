@@ -5,6 +5,7 @@ mod tproxy;
 mod http_proxy;
 mod socks5;
 mod stdio;
+mod tunnel_stdio;
 mod udp;
 #[cfg(unix)]
 mod unix_sock;
@@ -17,6 +18,7 @@ pub use tproxy::new_tproxy_udp;
 pub use http_proxy::HttpProxyTunnelListener;
 pub use socks5::Socks5TunnelListener;
 pub use stdio::new_stdio_listener;
+pub use tunnel_stdio::new_tunnelid_listener;
 pub use tcp::TcpTunnelListener;
 pub use udp::UdpTunnelListener;
 

@@ -14,6 +14,7 @@ use crate::tunnel::server::utils::{
     HttpResponse, bad_request, extract_authorization, extract_path_prefix, extract_tunnel_info,
     extract_x_forwarded_for, find_mapped_port, validate_tunnel,
 };
+use crate::tunnel::server::resolve_tunnel_over_http;
 use crate::tunnel::tls_reloader::TlsReloader;
 use crate::tunnel::{LocalProtocol, RemoteAddr, try_to_sock_addr};
 use ahash::AHasher;
@@ -42,6 +43,7 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tracing::{Instrument, Level, Span, error, info, span, warn};
 use url::{Host, Url};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct TlsServerConfig {
@@ -64,6 +66,7 @@ pub struct WsServerConfig {
     pub restriction_config: Option<PathBuf>,
     pub http_proxy: Option<Url>,
     pub remote_server_idle_timeout: Duration,
+    pub tunnel_resolver: Option<Url>,
 }
 
 #[derive(Clone)]
@@ -122,12 +125,52 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
 
         Span::current().record("id", &jwt.claims.id);
         Span::current().record("remote", format!("{}:{}", jwt.claims.r, jwt.claims.rp));
-        let remote = RemoteAddr::try_from(jwt.claims).map_err(|err| {
+        let mut remote = RemoteAddr::try_from(jwt.claims).map_err(|err| {
             warn!("Rejecting connection with bad tunnel info: {err} {}", req.uri());
             bad_request()
         })?;
 
         let authorization = extract_authorization(req);
+
+        if let LocalProtocol::TunnelStdio { proxy_protocol } = remote.protocol.clone() {
+            let tunnel_id = match &remote.host {
+                Host::Domain(s) => s,
+                _ => {
+                    warn!("Rejecting tunnel request: expected uuid in domain host, got {:?}", remote.host);
+                    return Err(bad_request());
+                }
+            };
+            let tunnel_uuid = match Uuid::parse_str(tunnel_id) {
+                Ok(u) => u,
+                Err(_) => {
+                    warn!("Rejecting tunnel request: invalid uuid host '{tunnel_id}'");
+                    return Err(bad_request());
+                }
+            };
+            let Some(resolver) = &self.config.tunnel_resolver else {
+                warn!("Rejecting tunnel request: server has no tunnel resolver configured");
+                return Err(bad_request());
+            };
+            let (mapped_host, mapped_port) = match resolve_tunnel_over_http(
+                resolver,
+                tunnel_uuid,
+                authorization,
+            )
+            .await
+            {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!("Rejecting tunnel request: cannot resolve tunnel uuid '{tunnel_uuid}': {err:?}");
+                    return Err(bad_request());
+                }
+            };
+            remote = RemoteAddr {
+                protocol: LocalProtocol::Tcp { proxy_protocol },
+                host: mapped_host,
+                port: mapped_port,
+            };
+        }
+
         let restriction = validate_tunnel(&remote, path_prefix, authorization, &restrictions).ok_or_else(|| {
             warn!("Rejecting connection with not allowed destination: {remote:?}");
             bad_request()
@@ -304,6 +347,7 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
                 Err(anyhow::anyhow!("Invalid upgrade request"))
             }
             LocalProtocol::Stdio { .. }
+            | LocalProtocol::TunnelStdio { .. }
             | LocalProtocol::Socks5 { .. }
             | LocalProtocol::TProxyTcp
             | LocalProtocol::TProxyUdp { .. }

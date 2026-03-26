@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "wstunnel server",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/wstunnel",
+            "args": [
+                "server",
+                "ws://[::]:8080",
+                "--tunnel-resolver",
+                "http://127.0.0.1:9000/tunnels"
+            ],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "build wstunnel"
+        },
+        {
+            "name": "tunnel-server",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/tunnel-server",
+            "args": [
+                "--bind",
+                "0.0.0.0:9000",
+                "--data",
+                "${workspaceRoot}/tunnel-server/tunnels.yaml"
+            ],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "build tunnel-server"
+        }
+    ]
+}
