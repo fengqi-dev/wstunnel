@@ -48,6 +48,7 @@ impl JwtTunnelConfig {
                 LocalProtocol::TProxyTcp => unreachable!("cannot use tproxy tcp as destination protocol"),
                 LocalProtocol::TProxyUdp { .. } => unreachable!("cannot use tproxy udp as destination protocol"),
                 LocalProtocol::Stdio { .. } => unreachable!("cannot use stdio as destination protocol"),
+                LocalProtocol::TunnelStdio { .. } => dest.protocol.clone(),
                 LocalProtocol::Unix { .. } => unreachable!("canont use unix as destination protocol"),
                 LocalProtocol::Socks5 { .. } => unreachable!("cannot use socks5 as destination protocol"),
                 LocalProtocol::HttpProxy { .. } => unreachable!("cannot use http proxy as destination protocol"),

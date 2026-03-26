@@ -33,7 +33,7 @@ pub struct Client {
     /// 'stdio://google.com:443'         =>       listen for data from stdio, mainly for `ssh -o ProxyCommand="wstunnel client -L stdio://%h:%p ws://localhost:8080" my-server`
     ///
     /// 'unix:///tmp/wstunnel.sock:g.com:443' =>  listen for data from unix socket of path /tmp/wstunnel.sock and forward to g.com:443
-    #[cfg_attr(feature = "clap", arg(short='L', long, value_name = "{tcp,udp,socks5,stdio,unix}://[BIND:]PORT:HOST:PORT", value_parser = parsers::parse_tunnel_arg, verbatim_doc_comment))]
+    #[cfg_attr(feature = "clap", arg(short='L', long, value_name = "{tcp,udp,socks5,stdio,tunnel,unix}://...", value_parser = parsers::parse_tunnel_arg, verbatim_doc_comment))]
     pub local_to_remote: Vec<LocalToRemote>,
 
     /// Listen on remote and forwards traffic from local. Can be specified multiple times. Only tcp is supported
@@ -399,6 +399,19 @@ pub struct Server {
         verbatim_doc_comment,
     ))]
     pub remote_to_local_server_idle_timeout: Duration,
+
+    /// Resolver base URL for `tunnel://{tunnelid}` requests (where tunnelid is a uuid).
+    /// The server resolves tunnelid -> host/port by doing an HTTP GET request to:
+    /// `{tunnel_resolver}/{uuid}`
+    ///
+    /// The endpoint must return a YAML body with:
+    /// `host: <string>`
+    /// `port: <u16>`
+    ///
+    /// Example:
+    /// `--tunnel-resolver http://127.0.0.1:9000/tunnels`
+    #[cfg_attr(feature = "clap", arg(long, value_name = "URL", verbatim_doc_comment))]
+    pub tunnel_resolver: Option<Url>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -423,6 +436,7 @@ mod parsers {
     use std::path::PathBuf;
     use std::str::FromStr;
     use std::time::Duration;
+    use uuid::Uuid;
     use tokio_rustls::rustls::pki_types::DnsName;
     use url::{Host, Url};
 
@@ -620,6 +634,30 @@ mod parsers {
                     remote: (dest_host, dest_port),
                 })
             }
+            "tunnel" => {
+                // Format: tunnel://{uuid}?proxy_protocol
+                // where `proxy_protocol` is optional boolean flag.
+                let (tunnel_id, query) = tunnel_info.split_once('?').unwrap_or((tunnel_info, ""));
+                let tunnel_id = tunnel_id.trim();
+
+                // Validate it is a UUID so we can reliably resolve it on the server.
+                let _uuid = Uuid::parse_str(tunnel_id).map_err(|e| {
+                    Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("Invalid tunnel uuid '{tunnel_id}': {e}"),
+                    )
+                })?;
+
+                // For now we only support `proxy_protocol` boolean.
+                let proxy_protocol = query.contains("proxy_protocol");
+
+                Ok(LocalToRemote {
+                    // There is no local bind/port for stdio-based tunnels.
+                    local_protocol: LocalProtocol::TunnelStdio { proxy_protocol },
+                    local: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0), 0)),
+                    remote: (Host::Domain(tunnel_id.to_string()), 0),
+                })
+            }
             "tproxy+tcp" => {
                 let (local_bind, remaining) = parse_local_bind(tunnel_info)?;
                 let x = format!("0.0.0.0:0?{remaining}");
@@ -668,7 +706,8 @@ mod parsers {
             | LocalProtocol::ReverseUnix { .. }
             | LocalProtocol::TProxyTcp
             | LocalProtocol::TProxyUdp { .. }
-            | LocalProtocol::Stdio { .. } => {
+            | LocalProtocol::Stdio { .. }
+            | LocalProtocol::TunnelStdio { .. } => {
                 return Err(io::Error::new(
                     ErrorKind::InvalidInput,
                     format!("Cannot use {:?} as reverse tunnels {}", proto.local_protocol, arg),

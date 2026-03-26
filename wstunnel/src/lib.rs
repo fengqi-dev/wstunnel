@@ -19,6 +19,7 @@ pub use crate::tunnel::client::{TlsClientConfig, WsClient, WsClientConfig};
 use crate::tunnel::connectors::{Socks5TunnelConnector, TcpTunnelConnector, UdpTunnelConnector};
 use crate::tunnel::listeners::{
     HttpProxyTunnelListener, Socks5TunnelListener, TcpTunnelListener, UdpTunnelListener, new_stdio_listener,
+    new_tunnelid_listener,
 };
 use crate::tunnel::server::{TlsServerConfig, WsServer, WsServerConfig};
 use crate::tunnel::transport::{TransportAddr, TransportScheme};
@@ -314,6 +315,7 @@ async fn create_client_tunnels(
                 }
             }
             LocalProtocol::Stdio { .. }
+            | LocalProtocol::TunnelStdio { .. }
             | LocalProtocol::TProxyTcp
             | LocalProtocol::TProxyUdp { .. }
             | LocalProtocol::Tcp { .. }
@@ -410,6 +412,21 @@ async fn create_client_tunnels(
 
             LocalProtocol::Stdio { proxy_protocol } => {
                 let (server, mut handle) = new_stdio_listener(tunnel.remote.clone(), *proxy_protocol).await?;
+                if let Err(err) = client.run_tunnel(server).await {
+                    error!("{:?}", err);
+                }
+
+                // We need to wait for either a ctrl+c of that the stdio tunnel is closed
+                // to force exit the program
+                select! {
+                   _ = handle.closed() => {},
+                   _ = tokio::signal::ctrl_c() => {}
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                std::process::exit(0);
+            }
+            LocalProtocol::TunnelStdio { proxy_protocol } => {
+                let (server, mut handle) = new_tunnelid_listener(tunnel.remote.clone(), *proxy_protocol).await?;
                 if let Err(err) = client.run_tunnel(server).await {
                     error!("{:?}", err);
                 }
@@ -522,6 +539,7 @@ async fn run_server_impl(args: Server, executor: impl TokioExecutorRef) -> anyho
         restriction_config: args.restrict_config,
         http_proxy,
         remote_server_idle_timeout: args.remote_to_local_server_idle_timeout,
+        tunnel_resolver: args.tunnel_resolver,
     };
     let server = WsServer::new(server_config, executor);
 
