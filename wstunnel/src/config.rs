@@ -436,9 +436,9 @@ mod parsers {
     use std::path::PathBuf;
     use std::str::FromStr;
     use std::time::Duration;
-    use uuid::Uuid;
     use tokio_rustls::rustls::pki_types::DnsName;
     use url::{Host, Url};
+    use uuid::Uuid;
 
     pub fn parse_duration_sec(arg: &str) -> Result<Duration, io::Error> {
         use std::io::Error;
@@ -642,10 +642,7 @@ mod parsers {
 
                 // Validate it is a UUID so we can reliably resolve it on the server.
                 let _uuid = Uuid::parse_str(tunnel_id).map_err(|e| {
-                    Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("Invalid tunnel uuid '{tunnel_id}': {e}"),
-                    )
+                    Error::new(ErrorKind::InvalidInput, format!("Invalid tunnel uuid '{tunnel_id}': {e}"))
                 })?;
 
                 // For now we only support `proxy_protocol` boolean.

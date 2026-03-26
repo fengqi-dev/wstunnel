@@ -85,10 +85,7 @@ fn load_data_file(path: &str) -> anyhow::Result<HashMap<Uuid, TunnelEntry>> {
     Ok(parsed.tunnels)
 }
 
-async fn get_tunnel(
-    State(state): State<AppState>,
-    Path(uuid): Path<Uuid>,
-) -> Response {
+async fn get_tunnel(State(state): State<AppState>, Path(uuid): Path<Uuid>) -> Response {
     let Some(entry) = state.map.get(&uuid) else {
         warn!("tunnel not found: {}", uuid);
         return StatusCode::NOT_FOUND.into_response();
@@ -101,4 +98,3 @@ async fn get_tunnel(
     headers.insert("content-type", "text/yaml; charset=utf-8".parse().unwrap());
     (StatusCode::OK, headers, body).into_response()
 }
-

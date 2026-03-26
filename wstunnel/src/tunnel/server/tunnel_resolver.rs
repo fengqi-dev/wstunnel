@@ -7,10 +7,9 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use serde::Deserialize;
 use std::net::IpAddr;
-use url::Url;
 use url::Host;
+use url::Url;
 use uuid::Uuid;
-
 
 #[derive(Debug, Deserialize)]
 struct TunnelEndpointResponse {
@@ -24,10 +23,7 @@ pub async fn resolve_tunnel_over_http(
     authorization: Option<&str>,
 ) -> anyhow::Result<(Host, u16)> {
     if base.scheme() != "http" {
-        return Err(anyhow!(
-            "tunnel resolver only supports http:// for now, got {}",
-            base.scheme()
-        ));
+        return Err(anyhow!("tunnel resolver only supports http:// for now, got {}", base.scheme()));
     }
 
     let mut url = base.clone();
@@ -43,10 +39,7 @@ pub async fn resolve_tunnel_over_http(
     let client: Client<HttpConnector, http_body_util::Empty<bytes::Bytes>> =
         Client::builder(TokioExecutor::new()).build_http();
     let req = if let Some(auth) = authorization.filter(|s| !s.is_empty()) {
-        Request::builder()
-            .method("GET")
-            .uri(uri)
-            .header(AUTHORIZATION, auth)
+        Request::builder().method("GET").uri(uri).header(AUTHORIZATION, auth)
     } else {
         Request::builder().method("GET").uri(uri)
     }
@@ -60,11 +53,7 @@ pub async fn resolve_tunnel_over_http(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let body = resp
-            .into_body()
-            .collect()
-            .await?
-            .to_bytes();
+        let body = resp.into_body().collect().await?.to_bytes();
         return Err(anyhow!(
             "resolver rejected tunnel {id}: status {} body {}",
             status,
@@ -72,11 +61,7 @@ pub async fn resolve_tunnel_over_http(
         ));
     }
 
-    let body = resp
-        .into_body()
-        .collect()
-        .await?
-        .to_bytes();
+    let body = resp.into_body().collect().await?.to_bytes();
     let payload = String::from_utf8(body.to_vec()).unwrap_or_default();
     let parsed: TunnelEndpointResponse = serde_yaml::from_str(&payload)
         .with_context(|| format!("cannot parse resolver response for tunnel {id} as YAML"))?;
@@ -99,4 +84,3 @@ fn parse_host(host: &str) -> anyhow::Result<Host> {
         Err(_) => Ok(Host::Domain(host.to_string())),
     }
 }
-

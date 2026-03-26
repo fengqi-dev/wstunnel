@@ -18,8 +18,8 @@ pub use tproxy::new_tproxy_udp;
 pub use http_proxy::HttpProxyTunnelListener;
 pub use socks5::Socks5TunnelListener;
 pub use stdio::new_stdio_listener;
-pub use tunnel_stdio::new_tunnelid_listener;
 pub use tcp::TcpTunnelListener;
+pub use tunnel_stdio::new_tunnelid_listener;
 pub use udp::UdpTunnelListener;
 
 #[cfg(unix)]

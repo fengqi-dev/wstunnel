@@ -9,12 +9,12 @@ use crate::tunnel::connectors::{TcpTunnelConnector, TunnelConnector, UdpTunnelCo
 use crate::tunnel::listeners::{HttpProxyTunnelListener, Socks5TunnelListener, TcpTunnelListener, UdpTunnelListener};
 use crate::tunnel::server::handler_http2::http_server_upgrade;
 use crate::tunnel::server::handler_websocket::ws_server_upgrade;
+use crate::tunnel::server::resolve_tunnel_over_http;
 use crate::tunnel::server::reverse_tunnel::ReverseTunnelServer;
 use crate::tunnel::server::utils::{
     HttpResponse, bad_request, extract_authorization, extract_path_prefix, extract_tunnel_info,
     extract_x_forwarded_for, find_mapped_port, validate_tunnel,
 };
-use crate::tunnel::server::resolve_tunnel_over_http;
 use crate::tunnel::tls_reloader::TlsReloader;
 use crate::tunnel::{LocalProtocol, RemoteAddr, try_to_sock_addr};
 use ahash::AHasher;
@@ -151,12 +151,7 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
                 warn!("Rejecting tunnel request: server has no tunnel resolver configured");
                 return Err(bad_request());
             };
-            let (mapped_host, mapped_port) = match resolve_tunnel_over_http(
-                resolver,
-                tunnel_uuid,
-                authorization,
-            )
-            .await
+            let (mapped_host, mapped_port) = match resolve_tunnel_over_http(resolver, tunnel_uuid, authorization).await
             {
                 Ok(v) => v,
                 Err(err) => {

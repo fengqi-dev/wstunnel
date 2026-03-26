@@ -55,7 +55,9 @@ where
                 Some(Ok((
                     stream,
                     RemoteAddr {
-                        protocol: LocalProtocol::TunnelStdio { proxy_protocol: this.proxy_protocol },
+                        protocol: LocalProtocol::TunnelStdio {
+                            proxy_protocol: this.proxy_protocol,
+                        },
                         host,
                         port,
                     },
@@ -66,4 +68,3 @@ where
         Poll::Ready(ret)
     }
 }
-
