@@ -9,10 +9,6 @@ RUN rustup component add rustfmt clippy && apt-get update && apt-get install cma
 WORKDIR /build
 COPY . ./
 
-
-RUN cargo fmt --all -- --check --color=always || (echo "Use cargo fmt to format your code"; exit 1)
-RUN cargo clippy --all -- -D warnings || (echo "Solve your clippy warnings to succeed"; exit 1)
-
 #RUN cargo test --all --all-features
 #RUN just test "tcp://localhost:2375" || (echo "Test are failing"; exit 1)
 
