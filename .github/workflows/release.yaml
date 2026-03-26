@@ -5,7 +5,10 @@ on:
     tags: [ "*" ]
   pull_request:
     branches: [ "main" ]
-
+    
+permissions:
+  contents: write
+  
 env:
   RUST_VERSION: 1.93.0
   BIN_NAME: "wstunnel"
@@ -190,7 +193,7 @@ jobs:
           version: '~> v1'
           args: release --clean --skip=validate
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
     name: Docker Build and Push
