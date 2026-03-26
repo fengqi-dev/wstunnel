@@ -4,6 +4,7 @@ pub mod executor;
 mod protocols;
 mod restrictions;
 mod somark;
+pub mod ssh_client;
 #[cfg(test)]
 mod test_integrations;
 pub mod tunnel;

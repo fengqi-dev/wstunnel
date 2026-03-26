@@ -4,9 +4,11 @@ use std::str::FromStr;
 use tracing::warn;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
+use uuid::Uuid;
 use wstunnel::LocalProtocol;
 use wstunnel::config::{Client, Server};
 use wstunnel::executor::DefaultTokioExecutor;
+use wstunnel::ssh_client::{SshClientConfig, run_ssh_client};
 use wstunnel::{run_client, run_server};
 
 #[cfg(feature = "jemalloc")]
@@ -57,6 +59,33 @@ pub struct Wstunnel {
 pub enum Commands {
     Client(Box<Client>),
     Server(Box<Server>),
+    Ssh(SshArgs),
+}
+
+#[derive(clap::Args, Debug)]
+pub struct SshArgs {
+    #[command(flatten)]
+    pub client: Client,
+
+    /// Tunnel id (uuid) to resolve server-side.
+    #[arg(long, value_name = "UUID")]
+    pub tunnel: Uuid,
+
+    /// SSH username.
+    #[arg(long)]
+    pub user: String,
+
+    /// Path to SSH private key (OpenSSH format).
+    #[arg(long, value_name = "FILE")]
+    pub key: std::path::PathBuf,
+
+    /// Optional private key passphrase.
+    #[arg(long, env = "WSTUNNEL_SSH_KEY_PASSPHRASE")]
+    pub key_passphrase: Option<String>,
+
+    /// Terminal type to request (PTY).
+    #[arg(long, default_value = "xterm-256color")]
+    pub term: String,
 }
 
 #[tokio::main]
@@ -72,21 +101,24 @@ async fn main() -> anyhow::Result<()> {
         .with_ansi(args.no_color.is_none())
         .with_env_filter(env_filter);
 
-    // stdio tunnel capture stdio, so need to log into stderr
-    if let Commands::Client(args) = &args.commands {
-        if args
-            .local_to_remote
-            .iter()
-            .filter(|x| matches!(x.local_protocol, LocalProtocol::Stdio { .. }))
-            .count()
-            > 0
-        {
-            logger.with_writer(io::stderr).init();
-        } else {
-            logger.init()
+    // stdio tunnel captures stdio, so log to stderr (also for interactive ssh).
+    match &args.commands {
+        Commands::Client(args) => {
+            if args.local_to_remote.iter().any(|x| {
+                matches!(
+                    x.local_protocol,
+                    LocalProtocol::Stdio { .. } | LocalProtocol::TunnelStdio { .. }
+                )
+            }) {
+                logger.with_writer(io::stderr).init();
+            } else {
+                logger.init()
+            }
         }
-    } else {
-        logger.init();
+        Commands::Ssh(_) => {
+            logger.with_writer(io::stderr).init();
+        }
+        Commands::Server(_) => logger.init(),
     };
     if let Err(err) = fdlimit::raise_fd_limit() {
         warn!("Failed to set soft filelimit to hard file limit: {}", err)
@@ -106,6 +138,20 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|err| {
                     panic!("Cannot start wstunnel server: {err:?}");
                 });
+        }
+        Commands::Ssh(args) => {
+            run_ssh_client(
+                SshClientConfig {
+                    client: args.client,
+                    tunnel: args.tunnel,
+                    user: args.user,
+                    key: args.key,
+                    key_passphrase: args.key_passphrase,
+                    term: args.term,
+                },
+                DefaultTokioExecutor::default(),
+            )
+            .await?;
         }
     }
 

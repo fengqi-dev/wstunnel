@@ -13,6 +13,8 @@
 * [Demo server](#demo)
 * [Command line](#cmd)
 * [Examples](#examples)
+* [Tunnel ID resolver](#tunnel-id-resolver)
+* [Embedded SSH client](#embedded-ssh-client)
 * [Release](#release)
 * [Note](#note)
 * [Benchmark](#bench)
@@ -36,6 +38,8 @@ nodejs to use this tool, I remade it in ~~Haskell~~ Rust and improved it.
 * Good error messages and debug information
 * Static forward (reverse) tunneling (TCP, UDP, Unix socket, Stdio)
 * Dynamic (reverse) tunneling (Socks5 proxy, HTTP proxy and Transparent Proxy)
+* Tunnel ID based forwarding (`tunnel://<uuid>`) resolved server-side over HTTP
+* Embedded SSH client mode (`wstunnel ssh`) with private key authentication
 * Support for using http proxy (when behind one) as gateway
 * Support of proxy protocol
 * Support for tls/https server with certificates auto-reload (with embedded self-signed certificate, or your own)
@@ -425,6 +429,71 @@ You can specify `stdio` as source port on the client side if you wish to use wst
 ```bash
 ssh -o ProxyCommand="wstunnel client --log-lvl=off -L stdio://%h:%p ws://myRemoteHost:8080" my-server
 ```
+
+---
+
+## Tunnel ID resolver <a name="tunnel-id-resolver"></a>
+
+`wstunnel` now supports a tunnel-id mode where the client only sends a UUID and the server resolves
+the final destination (`host:port`) over HTTP.
+
+### Client side
+
+Use `tunnel://<uuid>` as local-to-remote target:
+
+```bash
+wstunnel client -L 'tunnel://11111111-1111-1111-1111-111111111111' wss://myRemoteHost:443
+```
+
+### Server side
+
+Configure a resolver base URL:
+
+```bash
+wstunnel server --tunnel-resolver http://127.0.0.1:9000/tunnels wss://[::]:443
+```
+
+For a tunnel id `11111111-1111-1111-1111-111111111111`, server performs:
+
+`GET http://127.0.0.1:9000/tunnels/11111111-1111-1111-1111-111111111111`
+
+Expected response body (YAML):
+
+```yaml
+host: example.com
+port: 22
+```
+
+This repository includes a minimal resolver service in `tunnel-server/`:
+
+```bash
+cargo run -p tunnel-server -- --bind 127.0.0.1:9000 --data tunnel-server/tunnels.yaml
+```
+
+---
+
+## Embedded SSH client <a name="embedded-ssh-client"></a>
+
+You can open an interactive SSH shell directly from `wstunnel` (no external `ssh`, no ProxyCommand):
+
+```bash
+wstunnel client ssh \
+  --tunnel 11111111-1111-1111-1111-111111111111 \
+  --user ubuntu \
+  --key ~/.ssh/id_ed25519 \
+  wss://myRemoteHost:443
+```
+
+Optional passphrase for encrypted keys:
+
+```bash
+WSTUNNEL_SSH_KEY_PASSPHRASE='my-passphrase' wstunnel ssh --tunnel <uuid> --user <user> --key <key> wss://myRemoteHost:443
+```
+
+Notes:
+
+* `Ctrl+C` exits cleanly.
+* `Ctrl+D` in PTY mode is treated as local exit.
 
 ---
 

@@ -12,6 +12,8 @@ tracing = { version = "0.1.44", features = ["log"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt", "local-time"] }
 wstunnel = { path = "../wstunnel", default-features = false, features = ["clap"] }
 
+uuid = { version = "1.20.0", features = ["v7"] }
+
 tikv-jemallocator = { version = "0.6", optional = true }
 
 [features]
