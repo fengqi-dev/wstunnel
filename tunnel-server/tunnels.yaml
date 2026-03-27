@@ -1,4 +1,0 @@
-tunnels:
-  "7312d0a0-831d-4d31-8bbd-b73a73cff272":
-    host: "10.244.0.44"
-    port: 22

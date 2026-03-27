@@ -7,14 +7,16 @@ edition = "2024"
 anyhow = "1.0.100"
 axum = "0.8.4"
 clap = { version = "4.5.56", features = ["derive", "env"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_yaml = "0.9.34"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "net", "signal"] }
+futures = "0.3"
+k8s-openapi = { version = "0.27", default-features = false, features = ["latest"] }
+kube = { version = "3.1", features = ["runtime", "client", "rustls-tls"] }
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
 tracing = { version = "0.1.44", features = ["log"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt"] }
 uuid = { version = "1.20.0", features = ["serde"] }
+serde = "1.0"
+rustls = { version = "0.23.36", default-features = false, features = ["ring", "std"] }
 
 [[bin]]
 name = "tunnel-server"
 path = "src/main.rs"
-

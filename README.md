@@ -368,17 +368,31 @@ docker pull ghcr.io/erebe/wstunnel:latest
 
 ## Examples <a name="examples"></a>
 
-* [Understand command line syntax](#syntax)
-* [Simplest one with socks5 - Good for browsing internet](#simple)
-* [Proxy SSH](#ssh)
-* [Bypass a corporate proxy](#corporate)
-* [Proxy Wireguard traffic](#wireguard)
-* [Android](#android)
-* [Proxy easily any traffic with transparent proxy (linux only)](#tproxy)
-* [Reverse tunneling](#reverse)
-* [How to secure access of your wstunnel server](#secure)
-* [Use HTTP2 instead of websocket for transport protocol](#http2)
-* [Maximize your stealthiness/Make your traffic discrete](#stealth)
+- [Summary](#summary)
+- [Description ](#description-)
+- [Sponsors ](#sponsors-)
+- [Note ](#note-)
+- [Demo server ](#demo-server-)
+- [Command line ](#command-line-)
+- [Release ](#release-)
+- [Examples ](#examples-)
+  - [Understand command line syntax ](#understand-command-line-syntax-)
+  - [Simplest one ](#simplest-one-)
+  - [As proxy command for SSH ](#as-proxy-command-for-ssh-)
+- [Tunnel ID resolver ](#tunnel-id-resolver-)
+  - [Client side](#client-side)
+  - [Server side](#server-side)
+- [Embedded SSH client ](#embedded-ssh-client-)
+  - [When behind a corporate proxy ](#when-behind-a-corporate-proxy-)
+  - [Wireguard and wstunnel ](#wireguard-and-wstunnel-)
+  - [Android ](#android-)
+  - [Transparent proxy (linux only) ](#transparent-proxy-linux-only-)
+  - [Reverse tunneling ](#reverse-tunneling-)
+  - [How to secure the access of your wstunnel server ](#how-to-secure-the-access-of-your-wstunnel-server-)
+  - [Use HTTP2 instead of websocket for the transport protocol ](#use-http2-instead-of-websocket-for-the-transport-protocol-)
+  - [Maximize your stealthiness/Make your traffic discrete ](#maximize-your-stealthinessmake-your-traffic-discrete-)
+- [Benchmark ](#benchmark-)
+- [How to Build ](#how-to-build-)
 
 ### Understand command line syntax <a name="syntax"></a>
 
@@ -477,7 +491,7 @@ cargo run -p tunnel-server -- --bind 127.0.0.1:9000 --data tunnel-server/tunnels
 You can open an interactive SSH shell directly from `wstunnel` (no external `ssh`, no ProxyCommand):
 
 ```bash
-wstunnel client ssh \
+wstunnel ssh \
   --tunnel 11111111-1111-1111-1111-111111111111 \
   --user ubuntu \
   --key ~/.ssh/id_ed25519 \

@@ -16,7 +16,7 @@
                 "http://127.0.0.1:9000/tunnels"
             ],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "build wstunnel"
+            "preLaunchTask": "build"
         },
         {
             "name": "tunnel-server",
@@ -25,12 +25,10 @@
             "program": "${workspaceRoot}/target/debug/tunnel-server",
             "args": [
                 "--bind",
-                "0.0.0.0:9000",
-                "--data",
-                "${workspaceRoot}/tunnel-server/tunnels.yaml"
+                "0.0.0.0:9000"
             ],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "build tunnel-server"
+            "preLaunchTask": "build"
         }
     ]
 }

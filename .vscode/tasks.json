@@ -2,33 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build wstunnel",
+            "label": "build",
             "type": "shell",
             "command": "cargo",
             "args": [
-                "build",
-                "--package",
-                "wstunnel"
+                "build"
             ],
-            "options": {
-                "cwd": "${workspaceRoot}/wstunnel"
-            },
-            "problemMatcher": [
-                "$rustc"
-            ]
-        },
-        {
-            "label": "build tunnel-server",
-            "type": "shell",
-            "command": "cargo",
-            "args": [
-                "build",
-                "--package",
-                "tunnel-server"
-            ],
-            "options": {
-                "cwd": "${workspaceRoot}/tunnel-server"
-            },
             "problemMatcher": [
                 "$rustc"
             ]
