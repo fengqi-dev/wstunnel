@@ -8,6 +8,7 @@ use uuid::Uuid;
 use wstunnel::LocalProtocol;
 use wstunnel::config::{Client, Server};
 use wstunnel::executor::DefaultTokioExecutor;
+use wstunnel::scp_client::{ScpClientConfig, ScpTransfer, run_scp_client};
 use wstunnel::ssh_client::{SshClientConfig, run_ssh_client};
 use wstunnel::{run_client, run_server};
 
@@ -60,6 +61,7 @@ pub enum Commands {
     Client(Box<Client>),
     Server(Box<Server>),
     Ssh(SshArgs),
+    Scp(ScpArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -86,6 +88,40 @@ pub struct SshArgs {
     /// Terminal type to request (PTY).
     #[arg(long, default_value = "xterm-256color")]
     pub term: String,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct ScpArgs {
+    #[command(flatten)]
+    pub client: Client,
+
+    /// Tunnel id (uuid) to resolve server-side.
+    #[arg(long, value_name = "UUID")]
+    pub tunnel: Uuid,
+
+    /// SSH username.
+    #[arg(long)]
+    pub user: String,
+
+    /// Path to SSH private key (OpenSSH format).
+    #[arg(long, value_name = "FILE")]
+    pub key: std::path::PathBuf,
+
+    /// Optional private key passphrase.
+    #[arg(long, env = "WSTUNNEL_SSH_KEY_PASSPHRASE")]
+    pub key_passphrase: Option<String>,
+
+    /// Recursive copy (for directories).
+    #[arg(short, long)]
+    pub recursive: bool,
+
+    /// Source path. Prefix with ':' for remote, e.g. :/etc/hosts
+    #[arg(value_name = "SOURCE")]
+    pub source: String,
+
+    /// Destination path. Prefix with ':' for remote, e.g. :/tmp/
+    #[arg(value_name = "DEST")]
+    pub dest: String,
 }
 
 #[tokio::main]
@@ -115,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
                 logger.init()
             }
         }
-        Commands::Ssh(_) => {
+        Commands::Ssh(_) | Commands::Scp(_) => {
             logger.with_writer(io::stderr).init();
         }
         Commands::Server(_) => logger.init(),
@@ -149,6 +185,41 @@ async fn main() -> anyhow::Result<()> {
                     key_passphrase: args.key_passphrase,
                     term: args.term,
                 },
+                DefaultTokioExecutor::default(),
+            )
+            .await?;
+        }
+        Commands::Scp(args) => {
+            let is_src_remote = args.source.starts_with(':');
+            let is_dst_remote = args.dest.starts_with(':');
+
+            let transfer = match (is_src_remote, is_dst_remote) {
+                (false, true) => ScpTransfer::Upload {
+                    local: std::path::PathBuf::from(&args.source),
+                    remote: args.dest[1..].to_string(),
+                },
+                (true, false) => ScpTransfer::Download {
+                    remote: args.source[1..].to_string(),
+                    local: std::path::PathBuf::from(&args.dest),
+                },
+                (true, true) => {
+                    anyhow::bail!("both source and dest are remote – not supported");
+                }
+                (false, false) => {
+                    anyhow::bail!("one of source or dest must be a remote path (prefixed with ':')");
+                }
+            };
+
+            run_scp_client(
+                ScpClientConfig {
+                    client: args.client,
+                    tunnel: args.tunnel,
+                    user: args.user,
+                    key: args.key,
+                    key_passphrase: args.key_passphrase,
+                },
+                transfer,
+                args.recursive,
                 DefaultTokioExecutor::default(),
             )
             .await?;

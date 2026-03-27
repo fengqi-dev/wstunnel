@@ -1,6 +1,7 @@
 pub mod dns;
 pub mod http_proxy;
 pub mod socks5;
+pub mod ssh;
 pub mod stdio;
 pub mod tcp;
 pub mod tls;

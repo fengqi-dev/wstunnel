@@ -4,7 +4,8 @@ pub mod executor;
 mod protocols;
 mod restrictions;
 mod somark;
-pub mod ssh_client;
+pub use protocols::ssh::scp as scp_client;
+pub use protocols::ssh::shell as ssh_client;
 #[cfg(test)]
 mod test_integrations;
 pub mod tunnel;

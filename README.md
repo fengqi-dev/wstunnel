@@ -15,6 +15,7 @@
 * [Examples](#examples)
 * [Tunnel ID resolver](#tunnel-id-resolver)
 * [Embedded SSH client](#embedded-ssh-client)
+* [Embedded SCP client](#embedded-scp-client)
 * [Release](#release)
 * [Note](#note)
 * [Benchmark](#bench)
@@ -40,6 +41,7 @@ nodejs to use this tool, I remade it in ~~Haskell~~ Rust and improved it.
 * Dynamic (reverse) tunneling (Socks5 proxy, HTTP proxy and Transparent Proxy)
 * Tunnel ID based forwarding (`tunnel://<uuid>`) resolved server-side over HTTP
 * Embedded SSH client mode (`wstunnel ssh`) with private key authentication
+* Embedded SCP file transfer (`wstunnel scp`) for uploading/downloading files over the tunnel
 * Support for using http proxy (when behind one) as gateway
 * Support of proxy protocol
 * Support for tls/https server with certificates auto-reload (with embedded self-signed certificate, or your own)
@@ -383,6 +385,7 @@ docker pull ghcr.io/erebe/wstunnel:latest
   - [Client side](#client-side)
   - [Server side](#server-side)
 - [Embedded SSH client ](#embedded-ssh-client-)
+- [Embedded SCP client ](#embedded-scp-client-)
   - [When behind a corporate proxy ](#when-behind-a-corporate-proxy-)
   - [Wireguard and wstunnel ](#wireguard-and-wstunnel-)
   - [Android ](#android-)
@@ -478,11 +481,35 @@ host: example.com
 port: 22
 ```
 
-This repository includes a minimal resolver service in `tunnel-server/`:
+This repository includes a Kubernetes-aware resolver service in `tunnel-server/`.
+It watches pods with `wstunnel.io/tunnel-id` annotation and exposes their pod IP via the HTTP API.
+
+Pod annotation example:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    wstunnel.io/tunnel-id: "11111111-1111-1111-1111-111111111111"
+    wstunnel.io/tunnel-port: "22"   # optional, defaults to 22
+```
+
+Start the resolver:
 
 ```bash
-cargo run -p tunnel-server -- --bind 127.0.0.1:9000 --data tunnel-server/tunnels.yaml
+cargo run -p tunnel-server -- --bind 127.0.0.1:9000 --namespace default
 ```
+
+It accepts the following options:
+
+| Option | Env var | Description |
+|---|---|---|
+| `--bind` | `TUNNEL_SERVER_BIND` | Listen address (default `127.0.0.1:9000`) |
+| `--namespace` | `TUNNEL_SERVER_NAMESPACE` | K8s namespace to watch (empty = all namespaces) |
+
+The service uses the default kubeconfig (or in-cluster service account) and automatically
+adds/removes tunnel entries as pods come and go.
 
 ---
 
@@ -508,6 +535,49 @@ Notes:
 
 * `Ctrl+C` exits cleanly.
 * `Ctrl+D` in PTY mode is treated as local exit.
+
+---
+
+## Embedded SCP client <a name="embedded-scp-client"></a>
+
+Transfer files over the wstunnel tunnel without external `scp` or `sftp` commands.
+Remote paths are prefixed with `:`.
+
+**Upload a local file to a remote host:**
+
+```bash
+wstunnel scp \
+  --tunnel 11111111-1111-1111-1111-111111111111 \
+  --user ubuntu \
+  --key ~/.ssh/id_ed25519 \
+  wss://myRemoteHost:443 \
+  ./local_file.txt :/remote/path/
+```
+
+**Download a remote file to local:**
+
+```bash
+wstunnel scp \
+  --tunnel 11111111-1111-1111-1111-111111111111 \
+  --user ubuntu \
+  --key ~/.ssh/id_ed25519 \
+  wss://myRemoteHost:443 \
+  :/remote/file.txt ./local_dir/
+```
+
+**Recursive directory transfer (`-r`):**
+
+```bash
+wstunnel scp -r \
+  --tunnel 11111111-1111-1111-1111-111111111111 \
+  --user ubuntu \
+  --key ~/.ssh/id_ed25519 \
+  wss://myRemoteHost:443 \
+  ./my_dir :/remote/path/
+```
+
+The SCP client uses the standard SCP protocol over SSH exec channels, supporting both
+single file and recursive directory transfers.
 
 ---
 
