@@ -34,6 +34,7 @@ jsonwebtoken = { version = "10.3.0", default-features = false }
 log = "0.4.29"
 nix = { version = "0.31.1", features = ["socket", "net", "uio"] }
 parking_lot = "0.12.5"
+governor = { version = "0.10", default-features = false, features = ["std", "dashmap"] }
 pin-project = "1"
 notify = { version = "8.2.0", features = [] }
 httparse = { version = "1.10.1", features = [] }
@@ -43,7 +44,7 @@ rustls-pemfile = { version = "2.2.0", features = [] }
 x509-parser = "0.18.0"
 serde = { version = "1.0.228", features = ["derive"] }
 socket2 = { version = "0.6.2", features = ["all"] }
-tokio = { version = "1.49.0", features = ["io-std", "net", "signal", "sync", "time"] }
+tokio = { version = "1.49.0", features = ["fs", "io-std", "net", "signal", "sync", "time"] }
 tokio-stream = { version = "0.1.18", features = ["net"] }
 crossterm = "0.29.0"
 russh = "0.58.0"

@@ -11,17 +11,28 @@ use url::Host;
 use url::Url;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub struct TunnelEndpoint {
+    pub host: Host,
+    pub port: u16,
+    pub rate_limit_upload_m: Option<u16>,
+    pub rate_limit_download_m: Option<u16>,
+}
+
 #[derive(Debug, Deserialize)]
 struct TunnelEndpointResponse {
     host: String,
     port: u16,
+    rate_limit_upload_m: Option<u16>,
+    rate_limit_download_m: Option<u16>,
+    rate_limit_m: Option<u16>,
 }
 
 pub async fn resolve_tunnel_over_http(
     base: &Url,
     id: Uuid,
     authorization: Option<&str>,
-) -> anyhow::Result<(Host, u16)> {
+) -> anyhow::Result<TunnelEndpoint> {
     if base.scheme() != "http" {
         return Err(anyhow!("tunnel resolver only supports http:// for now, got {}", base.scheme()));
     }
@@ -68,7 +79,14 @@ pub async fn resolve_tunnel_over_http(
 
     let host = parse_host(&parsed.host)
         .with_context(|| format!("invalid host '{}' from resolver for tunnel {id}", parsed.host))?;
-    Ok((host, parsed.port))
+    let cap = |v: Option<u16>| v.map(|n| n.min(10));
+    Ok(TunnelEndpoint {
+        host,
+        port: parsed.port,
+        // Backward-compatible: legacy single rate_limit_m applies to both directions.
+        rate_limit_upload_m: cap(parsed.rate_limit_upload_m.or(parsed.rate_limit_m)),
+        rate_limit_download_m: cap(parsed.rate_limit_download_m.or(parsed.rate_limit_m)),
+    })
 }
 
 fn parse_host(host: &str) -> anyhow::Result<Host> {

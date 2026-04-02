@@ -19,4 +19,6 @@ impl AppState {
 pub struct TunnelEntry {
     pub host: String,
     pub port: u16,
+    pub rate_limit_upload_m: Option<u16>,
+    pub rate_limit_download_m: Option<u16>,
 }

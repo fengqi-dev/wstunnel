@@ -1,6 +1,7 @@
 pub mod client;
 pub mod connectors;
 pub mod listeners;
+pub mod rate_limiter;
 pub mod server;
 mod tls_reloader;
 pub mod transport;

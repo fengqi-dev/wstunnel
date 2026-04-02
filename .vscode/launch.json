@@ -11,6 +11,8 @@
             "program": "${workspaceRoot}/target/debug/wstunnel",
             "args": [
                 "server",
+                "--restrict-http-upgrade-path-prefix",
+                "tunnel",
                 "ws://[::]:8080",
                 "--tunnel-resolver",
                 "http://127.0.0.1:9000/tunnels"

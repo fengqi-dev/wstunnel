@@ -9,6 +9,7 @@ use crate::tunnel::connectors::{TcpTunnelConnector, TunnelConnector, UdpTunnelCo
 use crate::tunnel::listeners::{HttpProxyTunnelListener, Socks5TunnelListener, TcpTunnelListener, UdpTunnelListener};
 use crate::tunnel::server::handler_http2::http_server_upgrade;
 use crate::tunnel::server::handler_websocket::ws_server_upgrade;
+use crate::tunnel::rate_limiter::RateLimiterPool;
 use crate::tunnel::server::resolve_tunnel_over_http;
 use crate::tunnel::server::reverse_tunnel::ReverseTunnelServer;
 use crate::tunnel::server::utils::{
@@ -73,6 +74,7 @@ pub struct WsServerConfig {
 pub struct WsServer<E: crate::TokioExecutorRef = DefaultTokioExecutor> {
     pub config: Arc<WsServerConfig>,
     pub executor: E,
+    rate_limiter_pool: RateLimiterPool,
 }
 
 impl<E: crate::TokioExecutorRef> WsServer<E> {
@@ -80,6 +82,7 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
         Self {
             config: Arc::new(config),
             executor,
+            rate_limiter_pool: RateLimiterPool::new(),
         }
     }
 
@@ -131,6 +134,7 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
         })?;
 
         let authorization = extract_authorization(req);
+        let mut tunnel_rate_info: Option<(Uuid, Option<u16>, Option<u16>)> = None;
 
         if let LocalProtocol::TunnelStdio { proxy_protocol } = remote.protocol.clone() {
             let tunnel_id = match &remote.host {
@@ -151,18 +155,18 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
                 warn!("Rejecting tunnel request: server has no tunnel resolver configured");
                 return Err(bad_request());
             };
-            let (mapped_host, mapped_port) = match resolve_tunnel_over_http(resolver, tunnel_uuid, authorization).await
-            {
+            let endpoint = match resolve_tunnel_over_http(resolver, tunnel_uuid, authorization).await {
                 Ok(v) => v,
                 Err(err) => {
                     warn!("Rejecting tunnel request: cannot resolve tunnel uuid '{tunnel_uuid}': {err:?}");
                     return Err(bad_request());
                 }
             };
+            tunnel_rate_info = Some((tunnel_uuid, endpoint.rate_limit_upload_m, endpoint.rate_limit_download_m));
             remote = RemoteAddr {
                 protocol: LocalProtocol::Tcp { proxy_protocol },
-                host: mapped_host,
-                port: mapped_port,
+                host: endpoint.host,
+                port: endpoint.port,
             };
         }
 
@@ -184,6 +188,21 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
 
         let (remote_addr, local_rx, local_tx) = tunnel;
         info!("connected to {:?} {}:{}", req_protocol, remote_addr.host, remote_addr.port);
+
+        if let Some((tid, upload_m, download_m)) = tunnel_rate_info
+            && (upload_m.is_some() || download_m.is_some())
+        {
+            info!(
+                "applying shared rate limit for tunnel {}: upload={:?}MiB/s download={:?}MiB/s",
+                tid, upload_m, download_m
+            );
+            let (limited_rx, limited_tx) = self
+                .rate_limiter_pool
+                .wrap(tid, upload_m, download_m, local_rx, local_tx)
+                .await;
+            return Ok((remote_addr, Box::pin(limited_rx), Box::pin(limited_tx), inject_cookie));
+        }
+
         Ok((remote_addr, local_rx, local_tx, inject_cookie))
     }
 

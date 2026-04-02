@@ -479,7 +479,18 @@ Expected response body (YAML):
 ```yaml
 host: example.com
 port: 22
+rate_limit_upload_m: 5       # optional, MiB/s — client -> target (max 10)
+rate_limit_download_m: 10    # optional, MiB/s — target -> client (max 10)
 ```
+
+### Per-tunnel rate limiting
+
+The resolver can return optional `rate_limit_upload_m` and `rate_limit_download_m` fields (MiB/s).
+When present, wstunnel server applies shared token-bucket rate limiters **per tunnel-id**:
+all connections belonging to the same tunnel-id share a single bandwidth quota.
+If a field is absent, that direction is forwarded without limit.
+
+### tunnel-server (K8s resolver)
 
 This repository includes a Kubernetes-aware resolver service in `tunnel-server/`.
 It watches pods with `wstunnel.io/tunnel-id` annotation and exposes their pod IP via the HTTP API.
@@ -492,8 +503,17 @@ kind: Pod
 metadata:
   annotations:
     wstunnel.io/tunnel-id: "11111111-1111-1111-1111-111111111111"
-    wstunnel.io/tunnel-port: "22"   # optional, defaults to 22
+    wstunnel.io/tunnel-port: "22"                # optional, defaults to 22
+    wstunnel.io/tunnel-rate-limit-upload: "5"     # optional, MiB/s — client -> target (max 10)
+    wstunnel.io/tunnel-rate-limit-download: "10"  # optional, MiB/s — target -> client (max 10)
 ```
+
+`wstunnel.io/tunnel-rate-limit-upload` and `wstunnel.io/tunnel-rate-limit-download`
+are plain numbers representing **MiB/s**.
+Values are `u16` and capped at **10 MiB/s**. If an annotation is absent, that direction is not limited.
+
+Backward compatibility: legacy `wstunnel.io/tunnel-rate-limit` and `rate_limit_m`
+are still accepted and apply the same limit to both upload and download.
 
 Start the resolver:
 

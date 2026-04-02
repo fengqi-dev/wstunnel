@@ -9,4 +9,4 @@ mod utils;
 pub use server::TlsServerConfig;
 pub use server::WsServer;
 pub use server::WsServerConfig;
-pub use tunnel_resolver::resolve_tunnel_over_http;
+pub use tunnel_resolver::{TunnelEndpoint, resolve_tunnel_over_http};

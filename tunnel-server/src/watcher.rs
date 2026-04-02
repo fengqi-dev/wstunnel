@@ -9,9 +9,13 @@ use uuid::Uuid;
 
 use crate::state::{AppState, TunnelEntry};
 
-const ANN_TUNNEL_ID_COMPAT: &str = "wstunnel.io/tunnel-id";
+const ANN_TUNNEL_ID: &str = "wstunnel.io/tunnel-id";
 const ANN_TUNNEL_PORT: &str = "wstunnel.io/tunnel-port";
+const ANN_TUNNEL_RATE_LIMIT: &str = "wstunnel.io/tunnel-rate-limit";
+const ANN_TUNNEL_RATE_LIMIT_UPLOAD: &str = "wstunnel.io/tunnel-rate-limit-upload";
+const ANN_TUNNEL_RATE_LIMIT_DOWNLOAD: &str = "wstunnel.io/tunnel-rate-limit-download";
 const DEFAULT_TUNNEL_PORT: u16 = 22;
+const MAX_RATE_LIMIT_M: u16 = 10;
 
 pub async fn watch_pods(client: Client, namespace: &str, state: AppState) {
     let api: Api<Pod> = if namespace.is_empty() {
@@ -52,9 +56,7 @@ async fn handle_pod_event(state: &AppState, pod: &Pod) {
         None => return,
     };
 
-    let tunnel_id_str = match annotations
-        .get(ANN_TUNNEL_ID_COMPAT)
-    {
+    let tunnel_id_str = match annotations.get(ANN_TUNNEL_ID) {
         Some(v) => v,
         None => return,
     };
@@ -91,9 +93,22 @@ async fn handle_pod_event(state: &AppState, pod: &Pod) {
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_TUNNEL_PORT);
 
+    // Backward-compatible: legacy single rate limit applies to both directions.
+    fn parse_rate_limit(v: Option<&String>) -> Option<u16> {
+        v.and_then(|s| s.trim().parse::<u16>().ok()).map(|n| n.min(MAX_RATE_LIMIT_M))
+    }
+
+    let legacy_rate_limit = parse_rate_limit(annotations.get(ANN_TUNNEL_RATE_LIMIT));
+    let rate_limit_upload_m = parse_rate_limit(annotations.get(ANN_TUNNEL_RATE_LIMIT_UPLOAD))
+        .or(legacy_rate_limit);
+    let rate_limit_download_m = parse_rate_limit(annotations.get(ANN_TUNNEL_RATE_LIMIT_DOWNLOAD))
+        .or(legacy_rate_limit);
+
     let entry = TunnelEntry {
         host: pod_ip.to_string(),
         port,
+        rate_limit_upload_m,
+        rate_limit_download_m,
     };
 
     debug!("upsert tunnel {tunnel_id} -> {}:{} (pod {pod_name})", entry.host, entry.port);
