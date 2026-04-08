@@ -133,7 +133,10 @@ pub struct Client {
     /// as an alternative to disabling certificate verification entirely (--tls-verify-certificate=false).
     /// When this option is set, the standard CA chain verification is skipped and only the
     /// fingerprint is checked.
-    #[cfg_attr(feature = "clap", arg(long, value_name = "HEX_DIGEST", verbatim_doc_comment))]
+    #[cfg_attr(
+        feature = "clap",
+        arg(long, value_name = "HEX_DIGEST", value_parser = parsers::parse_tls_certificate_fingerprint, verbatim_doc_comment)
+    )]
     pub tls_certificate_fingerprint: Option<String>,
 
     /// If set, will use this http proxy to connect to the server
@@ -479,6 +482,35 @@ mod parsers {
         };
 
         Ok(Duration::from_secs(secs * multiplier))
+    }
+
+    /// Validate and normalise a SHA-256 certificate fingerprint supplied on the command line.
+    /// The fingerprint must be exactly 64 lowercase hex characters (32 bytes).
+    /// An optional "sha256:" prefix is stripped before validation.
+    pub fn parse_tls_certificate_fingerprint(arg: &str) -> Result<String, io::Error> {
+        use std::io::Error;
+
+        let hex_str = arg.strip_prefix("sha256:").unwrap_or(arg);
+        let normalised = hex_str.to_lowercase();
+
+        // SHA-256 produces 32 bytes = 64 hex characters
+        if normalised.len() != 64 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "invalid TLS certificate fingerprint length: expected 64 hex characters, got {}",
+                    normalised.len()
+                ),
+            ));
+        }
+        if !normalised.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "invalid TLS certificate fingerprint: must contain only hex characters (0-9, a-f)",
+            ));
+        }
+
+        Ok(normalised)
     }
 
     pub fn parse_local_bind(arg: &str) -> Result<(SocketAddr, &str), io::Error> {

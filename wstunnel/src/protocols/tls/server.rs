@@ -88,7 +88,8 @@ impl ServerCertVerifier for FingerprintVerifier {
         _now: UnixTime,
     ) -> Result<ServerCertVerified, Error> {
         let actual = hex::encode(Sha256::digest(end_entity.as_ref()));
-        if actual.eq_ignore_ascii_case(&self.expected_fingerprint) {
+        // expected_fingerprint is already normalised to lowercase on construction
+        if actual == self.expected_fingerprint {
             Ok(ServerCertVerified::assertion())
         } else {
             Err(Error::General(format!(
@@ -117,9 +118,8 @@ impl ServerCertVerifier for FingerprintVerifier {
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        // Only include SHA-256 and stronger algorithms; SHA-1 is cryptographically broken.
         vec![
-            SignatureScheme::RSA_PKCS1_SHA1,
-            SignatureScheme::ECDSA_SHA1_Legacy,
             SignatureScheme::RSA_PKCS1_SHA256,
             SignatureScheme::ECDSA_NISTP256_SHA256,
             SignatureScheme::RSA_PKCS1_SHA384,
@@ -217,7 +217,8 @@ pub fn tls_connector(
     if let Some(fp) = tls_certificate_fingerprint {
         info!("TLS certificate verification: using fingerprint pinning");
         config.dangerous().set_certificate_verifier(Arc::new(FingerprintVerifier {
-            expected_fingerprint: fp.to_lowercase(),
+            // Fingerprint is already normalised to lowercase by the CLI parser
+            expected_fingerprint: fp.to_string(),
         }));
     } else if !tls_verify_certificate {
         warn!("TLS certificate verification is DISABLED. Connections are vulnerable to man-in-the-middle attacks!");
