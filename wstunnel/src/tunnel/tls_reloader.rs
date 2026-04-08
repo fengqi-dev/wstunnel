@@ -286,6 +286,7 @@ impl TlsReloader {
                     (Ok(tls_certs), Ok(tls_key)) => {
                         let tls_connector = tls::tls_connector(
                             tls.tls_verify_certificate,
+                            tls.tls_certificate_fingerprint.as_deref(),
                             this.client_config.remote_addr.scheme().alpn_protocols(),
                             !tls.tls_sni_disabled,
                             None,
@@ -330,6 +331,7 @@ impl TlsReloader {
                     (Ok(tls_certs), Ok(tls_key)) => {
                         let tls_connector = tls::tls_connector(
                             tls.tls_verify_certificate,
+                            tls.tls_certificate_fingerprint.as_deref(),
                             this.client_config.remote_addr.scheme().alpn_protocols(),
                             !tls.tls_sni_disabled,
                             None,

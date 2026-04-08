@@ -9,6 +9,7 @@ repository = "https://github.com/erebe/wstunnel.git"
 ahash = { version = "0.8.12", features = [] }
 anyhow = "1.0.100"
 base64 = "0.22.1"
+hex = "0.4"
 scopeguard = "1.2.0"
 
 bb8 = { version = "0.9.1", features = [] }
@@ -41,6 +42,7 @@ httparse = { version = "1.10.1", features = [] }
 
 rustls-native-certs = { version = "0.8.3", features = [] }
 rustls-pemfile = { version = "2.2.0", features = [] }
+sha2 = "0.10"
 x509-parser = "0.18.0"
 serde = { version = "1.0.228", features = ["derive"] }
 socket2 = { version = "0.6.2", features = ["all"] }

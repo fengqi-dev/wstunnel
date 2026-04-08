@@ -3,6 +3,7 @@ use std::fs::File;
 use tokio_rustls::rustls::client::{EchConfig, EchMode};
 
 use log::warn;
+use sha2::{Digest, Sha256};
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::Arc;
@@ -32,6 +33,69 @@ impl ServerCertVerifier for NullVerifier {
         _now: UnixTime,
     ) -> Result<ServerCertVerified, Error> {
         Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::RSA_PKCS1_SHA1,
+            SignatureScheme::ECDSA_SHA1_Legacy,
+            SignatureScheme::RSA_PKCS1_SHA256,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA384,
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::RSA_PKCS1_SHA512,
+            SignatureScheme::ECDSA_NISTP521_SHA512,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA512,
+            SignatureScheme::ED25519,
+            SignatureScheme::ED448,
+        ]
+    }
+}
+
+#[derive(Debug)]
+struct FingerprintVerifier {
+    /// Expected SHA-256 fingerprint of the DER-encoded end-entity certificate (lowercase hex).
+    expected_fingerprint: String,
+}
+
+impl ServerCertVerifier for FingerprintVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, Error> {
+        let actual = hex::encode(Sha256::digest(end_entity.as_ref()));
+        if actual.eq_ignore_ascii_case(&self.expected_fingerprint) {
+            Ok(ServerCertVerified::assertion())
+        } else {
+            Err(Error::General(format!(
+                "TLS certificate fingerprint mismatch: expected {}, got {}",
+                self.expected_fingerprint, actual
+            )))
+        }
     }
 
     fn verify_tls12_signature(
@@ -105,6 +169,7 @@ pub fn load_private_key_from_file(path: &Path) -> anyhow::Result<PrivateKeyDer<'
 
 pub fn tls_connector(
     tls_verify_certificate: bool,
+    tls_certificate_fingerprint: Option<&str>,
     alpn_protocols: Vec<Vec<u8>>,
     enable_sni: bool,
     ech_config: Option<EchConfig>,
@@ -145,8 +210,17 @@ pub fn tls_connector(
     config.enable_sni = enable_sni;
     config.key_log = Arc::new(KeyLogFile::new());
 
-    // To bypass certificate verification
-    if !tls_verify_certificate {
+    // Certificate verification priority:
+    // 1. If a fingerprint is provided, verify only by pinned fingerprint (MITM-safe for self-signed certs).
+    // 2. If tls_verify_certificate is false, skip all verification (insecure).
+    // 3. Otherwise, use the default CA-based verification (secure default).
+    if let Some(fp) = tls_certificate_fingerprint {
+        info!("TLS certificate verification: using fingerprint pinning");
+        config.dangerous().set_certificate_verifier(Arc::new(FingerprintVerifier {
+            expected_fingerprint: fp.to_lowercase(),
+        }));
+    } else if !tls_verify_certificate {
+        warn!("TLS certificate verification is DISABLED. Connections are vulnerable to man-in-the-middle attacks!");
         config.dangerous().set_certificate_verifier(Arc::new(NullVerifier));
     }
 

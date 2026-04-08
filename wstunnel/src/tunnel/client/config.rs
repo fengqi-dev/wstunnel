@@ -54,6 +54,7 @@ pub struct TlsClientConfig {
     pub tls_sni_disabled: bool,
     pub tls_sni_override: Option<DnsName<'static>>,
     pub tls_verify_certificate: bool,
+    pub tls_certificate_fingerprint: Option<String>,
     pub tls_connector: Arc<RwLock<TlsConnector>>,
     pub tls_certificate_path: Option<PathBuf>,
     pub tls_key_path: Option<PathBuf>,

@@ -111,6 +111,7 @@ pub async fn create_client(
 
             let tls_connector = tls::tls_connector(
                 args.tls_verify_certificate,
+                args.tls_certificate_fingerprint.as_deref(),
                 transport_scheme.alpn_protocols(),
                 !args.tls_sni_disable,
                 ech_config,
@@ -123,6 +124,7 @@ pub async fn create_client(
                 tls_connector: Arc::new(RwLock::new(tls_connector)),
                 tls_sni_override: args.tls_sni_override,
                 tls_verify_certificate: args.tls_verify_certificate,
+                tls_certificate_fingerprint: args.tls_certificate_fingerprint,
                 tls_sni_disabled: args.tls_sni_disable,
                 tls_certificate_path: args.tls_certificate.clone(),
                 tls_key_path: args.tls_private_key.clone(),

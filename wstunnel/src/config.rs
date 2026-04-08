@@ -111,9 +111,30 @@ pub struct Client {
     pub tls_ech_enable: bool,
 
     /// Enable TLS certificate verification.
-    /// Disabled by default. The client will happily connect to any server with self-signed certificate.
-    #[cfg_attr(feature = "clap", arg(long, verbatim_doc_comment))]
+    /// Enabled by default. Disable only if you understand the security implications.
+    /// Use --tls-certificate-fingerprint instead for servers with self-signed certificates.
+    /// To disable: --tls-verify-certificate=false
+    #[cfg_attr(
+        feature = "clap",
+        arg(
+            long,
+            default_value = "true",
+            action = clap::ArgAction::Set,
+            value_name = "BOOL",
+            verbatim_doc_comment
+        )
+    )]
     pub tls_verify_certificate: bool,
+
+    /// If set, the client will verify that the server TLS certificate matches this fingerprint.
+    /// The fingerprint is the SHA-256 digest of the DER-encoded certificate, in lowercase hex.
+    /// Example: --tls-certificate-fingerprint aabbccddeeff...
+    /// This option provides MITM protection when connecting to servers using self-signed certificates,
+    /// as an alternative to disabling certificate verification entirely (--tls-verify-certificate=false).
+    /// When this option is set, the standard CA chain verification is skipped and only the
+    /// fingerprint is checked.
+    #[cfg_attr(feature = "clap", arg(long, value_name = "HEX_DIGEST", verbatim_doc_comment))]
+    pub tls_certificate_fingerprint: Option<String>,
 
     /// If set, will use this http proxy to connect to the server
     #[cfg_attr(
