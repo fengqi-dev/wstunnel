@@ -715,6 +715,9 @@ FAQ
   interface -> wstunnel client -> wireguard interface
 - If you have trouble making it works on windows, please check this issue
   https://github.com/erebe/wstunnel/issues/252
+- If you need true end-to-end encryption for your data stream, use an encrypted protocol inside the tunnel (for example:
+  HTTPS/TLS, SSH, WireGuard, etc.).
+  `wss://`/`https://` only encrypts traffic between the wstunnel client and server; adding mTLS authenticates both sides.
 
 ---
 
