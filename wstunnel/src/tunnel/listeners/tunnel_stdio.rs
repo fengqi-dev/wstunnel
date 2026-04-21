@@ -3,6 +3,7 @@ use crate::tunnel::{LocalProtocol, RemoteAddr};
 use anyhow::{Context, anyhow};
 use std::pin::Pin;
 use std::task::Poll;
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::oneshot;
 use tokio_stream::Stream;
@@ -16,11 +17,13 @@ where
     listener: Option<(R, W)>,
     dest: (Host, u16),
     proxy_protocol: bool,
+    timeout: Option<Duration>,
 }
 
 pub async fn new_tunnelid_listener(
     dest: (Host, u16),
     proxy_protocol: bool,
+    timeout: Option<Duration>,
 ) -> anyhow::Result<(
     TunnelStdioTunnelListener<impl AsyncRead + Send, impl AsyncWrite + Send>,
     oneshot::Sender<()>,
@@ -34,6 +37,7 @@ pub async fn new_tunnelid_listener(
             listener: Some(listener),
             proxy_protocol,
             dest,
+            timeout,
         },
         handle,
     ))
@@ -57,6 +61,7 @@ where
                     RemoteAddr {
                         protocol: LocalProtocol::TunnelStdio {
                             proxy_protocol: this.proxy_protocol,
+                            timeout: this.timeout,
                         },
                         host,
                         port,

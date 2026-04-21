@@ -427,8 +427,8 @@ async fn create_client_tunnels(
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 std::process::exit(0);
             }
-            LocalProtocol::TunnelStdio { proxy_protocol } => {
-                let (server, mut handle) = new_tunnelid_listener(tunnel.remote.clone(), *proxy_protocol).await?;
+            LocalProtocol::TunnelStdio { proxy_protocol, timeout } => {
+                let (server, mut handle) = new_tunnelid_listener(tunnel.remote.clone(), *proxy_protocol, *timeout).await?;
                 if let Err(err) = client.run_tunnel(server).await {
                     error!("{:?}", err);
                 }
@@ -437,7 +437,18 @@ async fn create_client_tunnels(
                 // to force exit the program
                 select! {
                    _ = handle.closed() => {},
-                   _ = tokio::signal::ctrl_c() => {}
+                   _ = tokio::signal::ctrl_c() => {},
+                   _ = async {
+                       if let Some(timeout) = timeout {
+                           tokio::time::sleep(*timeout).await;
+                       } else {
+                           std::future::pending::<()>().await;
+                       }
+                   } => {
+                       if let Some(timeout) = timeout {
+                           error!("tunnel:// timed out after {:?}", timeout);
+                       }
+                   }
                 }
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 std::process::exit(0);

@@ -449,12 +449,12 @@ ssh -o ProxyCommand="wstunnel client --log-lvl=off -L stdio://%h:%p ws://myRemot
 
 ---
 
-## Tunnel ID resolver <a name="tunnel-id-resolver"></a>
+### Tunnel ID resolver <a name="tunnel-id-resolver"></a>
 
 `wstunnel` now supports a tunnel-id mode where the client only sends a UUID and the server resolves
 the final destination (`host:port`) over HTTP.
 
-### Client side
+#### Client side
 
 Use `tunnel://<uuid>` as local-to-remote target:
 
@@ -462,7 +462,13 @@ Use `tunnel://<uuid>` as local-to-remote target:
 wstunnel client -L 'tunnel://11111111-1111-1111-1111-111111111111' wss://myRemoteHost:443
 ```
 
-### Server side
+You can also add `timeout_sec`:
+
+```bash
+wstunnel client -L 'tunnel://11111111-1111-1111-1111-111111111111?timeout_sec=30' wss://myRemoteHost:443
+```
+
+#### Server side
 
 Configure a resolver base URL:
 

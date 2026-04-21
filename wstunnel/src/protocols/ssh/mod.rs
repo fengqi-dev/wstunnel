@@ -42,7 +42,10 @@ pub(crate) async fn connect_ssh(
     let ws_client = create_client(client_cfg, executor).await?;
 
     let remote = RemoteAddr {
-        protocol: TunnelLocalProtocol::TunnelStdio { proxy_protocol: false },
+        protocol: TunnelLocalProtocol::TunnelStdio {
+            proxy_protocol: false,
+            timeout: None,
+        },
         host: Host::Domain(tunnel.to_string()),
         port: 0,
     };

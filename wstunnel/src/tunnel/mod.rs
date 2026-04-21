@@ -26,6 +26,7 @@ pub enum LocalProtocol {
     },
     TunnelStdio {
         proxy_protocol: bool,
+        timeout: Option<Duration>,
     },
     Socks5 {
         timeout: Option<Duration>,

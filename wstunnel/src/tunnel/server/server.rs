@@ -136,7 +136,7 @@ impl<E: crate::TokioExecutorRef> WsServer<E> {
         let authorization = extract_authorization(req);
         let mut tunnel_rate_info: Option<(Uuid, Option<u16>, Option<u16>)> = None;
 
-        if let LocalProtocol::TunnelStdio { proxy_protocol } = remote.protocol.clone() {
+        if let LocalProtocol::TunnelStdio { proxy_protocol, .. } = remote.protocol.clone() {
             let tunnel_id = match &remote.host {
                 Host::Domain(s) => s,
                 _ => {

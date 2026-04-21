@@ -32,6 +32,8 @@ pub struct Client {
     ///
     /// 'stdio://google.com:443'         =>       listen for data from stdio, mainly for `ssh -o ProxyCommand="wstunnel client -L stdio://%h:%p ws://localhost:8080" my-server`
     ///
+    /// 'tunnel://11111111-1111-1111-1111-111111111111?timeout_sec=30' => resolve the UUID server-side and stop the tunnel after 30s
+    ///
     /// 'unix:///tmp/wstunnel.sock:g.com:443' =>  listen for data from unix socket of path /tmp/wstunnel.sock and forward to g.com:443
     #[cfg_attr(feature = "clap", arg(short='L', long, value_name = "{tcp,udp,socks5,stdio,tunnel,unix}://...", value_parser = parsers::parse_tunnel_arg, verbatim_doc_comment))]
     pub local_to_remote: Vec<LocalToRemote>,
@@ -635,8 +637,7 @@ mod parsers {
                 })
             }
             "tunnel" => {
-                // Format: tunnel://{uuid}?proxy_protocol
-                // where `proxy_protocol` is optional boolean flag.
+                // Format: tunnel://{uuid}?proxy_protocol&timeout_sec=10
                 let (tunnel_id, query) = tunnel_info.split_once('?').unwrap_or((tunnel_info, ""));
                 let tunnel_id = tunnel_id.trim();
 
@@ -645,12 +646,17 @@ mod parsers {
                     Error::new(ErrorKind::InvalidInput, format!("Invalid tunnel uuid '{tunnel_id}': {e}"))
                 })?;
 
-                // For now we only support `proxy_protocol` boolean.
-                let proxy_protocol = query.contains("proxy_protocol");
+                let options: BTreeMap<String, String> = if query.is_empty() {
+                    BTreeMap::new()
+                } else {
+                    url::form_urlencoded::parse(query.as_bytes()).into_owned().collect()
+                };
+                let proxy_protocol = options.contains_key("proxy_protocol");
+                let timeout = get_timeout(&options);
 
                 Ok(LocalToRemote {
                     // There is no local bind/port for stdio-based tunnels.
-                    local_protocol: LocalProtocol::TunnelStdio { proxy_protocol },
+                    local_protocol: LocalProtocol::TunnelStdio { proxy_protocol, timeout },
                     local: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0), 0)),
                     remote: (Host::Domain(tunnel_id.to_string()), 0),
                 })
@@ -836,6 +842,16 @@ mod parsers {
                 remote: (Host::Ipv6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 4443),
             }
         ; "with full ipv6 tunnel")]
+        #[test_case("tunnel://11111111-1111-1111-1111-111111111111?timeout_sec=30&proxy_protocol" =>
+            LocalToRemote {
+                local_protocol: LocalProtocol::TunnelStdio {
+                    proxy_protocol: true,
+                    timeout: Some(std::time::Duration::from_secs(30)),
+                },
+                local: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
+                remote: (Host::Domain("11111111-1111-1111-1111-111111111111".to_string()), 0),
+            }
+        ; "with tunnel timeout and proxy protocol")]
         fn test_parse_tunnel_arg(input: &str) -> LocalToRemote {
             parse_tunnel_arg(input).unwrap()
         }
